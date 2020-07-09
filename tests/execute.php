@@ -27,7 +27,7 @@ while (count($childProcessIds) < $workerCount = 100)
 		$predis->sadd("control-queues", [$controlQueueId = sprintf('control-queue-%02d', \getmypid())]);
 		while(true)
 		{
-			$popped = $predis->brpop([$jobQueueId, $controlQueueId], 5);
+			$popped = $predis->brpop([$controlQueueId, $jobQueueId], 5);
 			if($popped === null)
 			{
 				continue;

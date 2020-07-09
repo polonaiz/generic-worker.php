@@ -1,6 +1,7 @@
 {
 	"name": "polonaiz/executor",
 	"require": {
+		"php": "^7.3",
 		"predis/predis": "^1.1",
 		"opis/closure": "^3.5"
 	},
