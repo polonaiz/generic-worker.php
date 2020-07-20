@@ -20,7 +20,7 @@ runtime-build:
 		--tag ${RUNTIME_TAG} \
 		./env/docker
 
-runtime-bash:
+runtime-shell:
 	docker run --rm -it \
  		${RUNTIME_TAG} bash
 

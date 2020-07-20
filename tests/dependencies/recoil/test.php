@@ -1,24 +1,31 @@
-<?php
-
-/**
- * This example shows how coroutines can return values to the caller.
- */
-
-declare(strict_types = 1);
+<?php declare(strict_types=1);
 
 require __DIR__ . '/../../../vendor/autoload.php';
 
 use Recoil\ReferenceKernel\ReferenceKernel;
+use Recoil\Recoil;
 
-function asyncMultiply($a, $b)
+function delayedEchoAsync(string $message, float $delaySec)
 {
-	yield; // force PHP to parse this function as a generator
-	sleep(1);
-	return $a * $b;
-	echo 'This code is never reached.';
+	yield Recoil::sleep($delaySec);
+	echo "delayedEcho: {$message}, {$delaySec}" . PHP_EOL;
 }
 
-ReferenceKernel::start(function () {
-	$result = yield asyncMultiply(2, 3);
-	echo '2 * 3 is ' . $result . PHP_EOL;
-});
+ReferenceKernel::start(function ()
+	{
+		$coroutines =
+			[
+				function ()
+					{
+						yield delayedEchoAsync('nested', 1);
+						yield delayedEchoAsync('nested2', 1);
+					},
+				delayedEchoAsync('top-tier', 2),
+				delayedEchoAsync('top-tier', 3),
+				delayedEchoAsync('top-tier', 4),
+				delayedEchoAsync('top-tier', 5),
+				delayedEchoAsync('top-tier', 6)
+			];
+
+		yield $coroutines;
+	});

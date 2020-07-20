@@ -15,6 +15,7 @@ $factorial = function ($n) use (&$factorial)
 
 // Wrap the closure
 $wrapper = new SerializableClosure($factorial);
+$serialized1 = $wrapper->serialize();
 // Now it can be serialized
 $serialized = serialize($wrapper);
 
