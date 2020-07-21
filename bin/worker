@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+
+<?php
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use Recoil\React\ReactKernel;
+use Executor\SimpleWorker;
+
+ReactKernel::start(SimpleWorker::mainAsync());
+

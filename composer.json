@@ -1,5 +1,11 @@
 {
 	"name": "polonaiz/executor",
+	"authors": [
+		{
+			"name": "polonaiz",
+			"email": "polonaiz@gmail.com"
+		}
+	],
 	"require": {
 		"php": "^7.3",
 		"ext-json": "*",
@@ -13,10 +19,12 @@
 	"require-dev": {
 		"phpunit/phpunit": "^9.2"
 	},
-	"authors": [
-		{
-			"name": "polonaiz",
-			"email": "polonaiz@gmail.com"
+	"autoload": {
+		"psr-4": {
+			"Executor\\": [
+				"src/",
+				"tests/"
+			]
 		}
-	]
+	}
 }
