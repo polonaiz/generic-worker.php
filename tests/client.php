@@ -24,35 +24,58 @@ function serializeClosure($closure)
 	return \serialize($wrapper);
 }
 
-ReactKernel::start(function () use ($adder, $subtractor)
+class Executor
+{
+	private $config;
+	private $redisClient;
+	private $returnQueues;
+
+	public static function createAsync($config = [])
 	{
 		$factory = new Factory(yield Recoil::eventLoop());
 		$redisClient = yield $factory->createClient('localhost');
+		$config += ['redisClient' => $redisClient];
 
-		$returnQueues = [];
+		return new Executor($config);
+	}
+
+	public function __construct($config = [])
+	{
+		$this->config = $config;
+	}
+
+	public function submitAsync(Closure $closure, array $param)
+	{
+		$redisClient = $this->config['redisClient'];
+
+		// discover worker
+		$taskQueues = yield $redisClient->smembers('task-queues');
+		$taskQueue = $taskQueues[0];
+
+		$returnQueue = sprintf('task-%s-return', $taskId = \uniqid());
+		yield $redisClient->del($returnQueue);
+		yield $redisClient->lpush($taskQueue, \json_encode([
+			'closure' => serializeClosure($closure),
+			'param' => $param,
+			'return' => $returnQueue
+		]));
+		$this->returnQueues[] = $returnQueue;
+
+		return $taskId;
+	}
+
+	public function waitFirstAsync()
+	{
+		
+	}
+}
+
+ReactKernel::start(function () use ($adder, $subtractor)
+	{
+		$executor = yield Executor::createAsync();
+
 		yield Recoil::all([
-			function () use ($redisClient, $adder, &$returnQueues)
-				{
-					$returnQueue = 'task1-return';
-					yield $redisClient->del($returnQueue);
-					yield $redisClient->lpush('task-queue', \json_encode([
-						'closure' => serializeClosure($adder),
-						'param' => [1, 2],
-						'return' => $returnQueue
-					]));
-					$returnQueues[] = $returnQueue;
-				},
-			function () use ($redisClient, $subtractor, &$returnQueues)
-				{
-					$returnQueue = 'task2-return';
-					yield $redisClient->del($returnQueue);
-					yield $redisClient->lpush('task-queue', \json_encode([
-						'closure' => serializeClosure($subtractor),
-						'param' => [3, 1],
-						'return' => $returnQueue
-					]));
-					$returnQueues[] = $returnQueue;
-				}
+			$executor->submitAsync($adder, [1,2])
 		]);
 
 		yield Recoil::all([
