@@ -13,11 +13,20 @@ class SimpleWorker
 	{
 		echo 'started' . PHP_EOL;
 
+		set_error_handler
+        (
+            function ($errno, $errstr, $errfile, $errline)
+            {
+                throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+            }
+		);
+		
 		//
 		global $argv;
 		$cliParser = new Parser();
 		$cliParams = $cliParser->parse($argv);
-		$workerId = $cliParams[0];
+		$workerId = $cliParams[0] ?? \getmypid();
+		echo "workerId={$workerId}" . PHP_EOL;
 
 		//
 		$taskQueueKey = "task-queue-{$workerId}";
@@ -38,7 +47,7 @@ class SimpleWorker
 		//
 		while (true)
 		{
-			$popped = yield $redisClient->brPop($controlQueueKey, $taskQueueKey, 60);
+			$popped = yield $redisClient->brPop($controlQueueKey, $taskQueueKey,  60);
 			echo "popped: " . \json_encode($popped) . PHP_EOL;
 			if ($popped === null)
 				continue;

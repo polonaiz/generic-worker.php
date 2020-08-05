@@ -42,3 +42,7 @@ composer-update-in-runtime:
 
 composer-clean:
 	rm -rf ./vendor
+
+start:
+	./bin/worker
+	
