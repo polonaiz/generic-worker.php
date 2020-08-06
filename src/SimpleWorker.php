@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Executor;
 
@@ -9,23 +9,27 @@ use Recoil\Recoil;
 
 class SimpleWorker
 {
+	/**
+	 * @throws \Throwable
+	 */
 	public static function mainAsync()
 	{
-		echo 'started' . PHP_EOL;
+		log(['type' => 'started']);
 
-		set_error_handler
-        (
-            function ($errno, $errstr, $errfile, $errline)
-            {
-                throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
-            }
-		);
-		
 		//
+		set_error_handler(function ($errno, $errstr, $errfile, $errline)
+			{
+				throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+			});
+
+		// shared data
+		$status = [];
+
+		// bootstrap
 		global $argv;
 		$cliParser = new Parser();
 		$cliParams = $cliParser->parse($argv);
-		$workerId = $cliParams[0] ?? \getmypid();
+		$workerId = $cliParams[0] ?? \uniqid();
 		echo "workerId={$workerId}" . PHP_EOL;
 
 		//
@@ -36,31 +40,104 @@ class SimpleWorker
 		//
 		$redisFactory = new Factory(yield Recoil::eventLoop());
 		/** @var Client $redisClient */
-		$redisClient = yield $redisFactory->createClient('localhost');
+		$redisHost = 'localhost';
+		$redisClient = yield $redisFactory->createClient($redisHost);
 
-		//
-		$taskQueueRegistryKey = 'task-queues';
-		$controlQueueRegistryKey = 'control-queues';
-		yield $redisClient->sadd($taskQueueRegistryKey, $taskQueueKey);
-		yield $redisClient->sadd($controlQueueRegistryKey, $controlQueueKey);
+		yield $redisClient->sadd('worker_id_set', $workerId);
+		$status =
+			[
+				'workerId' => $workerId,
+				'workerHost' => \gethostname(),
+				'workerPid' => \getmypid(),
+				'workerRuntimeConf' => null,
+				'workerStart' => (new \DateTime())->format('Y-m-d H:i:s.u'),
+				'workerControlQueue' => "$controlQueueKey",
+				'workerTaskQueue' => "$taskQueueKey",
+			];
+		yield $redisClient->set(
+			$workerStatusKey = "worker_status_$workerId",
+			\json_encode($status)
+		);
 
-		//
+
+		// execution loops
+		yield Recoil::all([
+			self::loopUpdateStatusAsync($status),
+			self::loopExecuteTaskAsync($status, $redisClient, $controlQueueKey, $taskQueueKey),
+		]);
+	}
+
+	private static function loopUpdateStatusAsync(
+		&$status
+	)
+	{
 		while (true)
 		{
-			$popped = yield $redisClient->brPop($controlQueueKey, $taskQueueKey,  60);
-			echo "popped: " . \json_encode($popped) . PHP_EOL;
+			//
+			$workerStatus['statusUpdate'] = (new \DateTime())->format('Y-m-d H:i:s.u');
+
+			//
+			log([
+				'type' => 'updateStatusAsync',
+				'status' => $status,
+			]);
+
+			//
+			yield Recoil::sleep(3);
+		}
+	}
+
+	private static function loopExecuteTaskAsync(
+		&$status,
+		$redisClient, $controlRequestQueue, $taskRequestQueue
+	)
+	{
+		while (true)
+		{
+			//
+			$popped = yield $redisClient->brPop($controlRequestQueue, $taskRequestQueue, $maxWaitSec = 5);
+			log(['type' => 'popped', 'task' => $popped]);
 			if ($popped === null)
 				continue;
 
-			[$queue, $serTask] = $popped;
-			$task = \json_decode($serTask, true);
-			$result = \call_user_func_array(\unserialize($task['closure']), $task['param']);
-			echo "result: " . \json_encode($result) . PHP_EOL;
-			echo "return: " . $task['return'] . PHP_EOL;
+			//
+			[$queue, $serRequest] = $popped;
+			$request = \json_decode($serRequest, true);
+			$requestType = $request['type'];
+			if ($requestType === 'exec_php_closure')
+			{
+				$closure = $request['closure'];
+				$param = $request['param'];
+				$result = \call_user_func_array(\unserialize($closure), $param);
+				log(['type' => 'execPhpClosure', 'result' => $request]);
 
-			yield $redisClient->lpush($task['return'], \json_encode($result));
+				//
+				yield $redisClient->lpush($request['returnQueue'], \json_encode($result));
+			}
+			else
+			{
+				log(['type' => 'unsupported request type', 'requestType' => $requestType]);
+
+				//
+				$result = null;
+				try
+				{
+					throw new \Exception("unsupported request type");
+				}
+				catch (\Throwable $t)
+				{
+					$result = \serialize($t);
+				}
+
+				//
+				yield $redisClient->lpush($request['returnQueue'], \json_encode($result));
+			}
 		}
 	}
 }
 
+function log(array $data)
+{
+	echo \json_encode($data, JSON_PRETTY_PRINT) . PHP_EOL . PHP_EOL;
 
+}

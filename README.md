@@ -15,10 +15,12 @@
         * string : guid.. hash?
     * worker_status_t
         * worker_id : worker_id_t
+        * worker_host : string
         * worker_pid : int
         * worker_runtime_conf : runtime_conf_t
         * worker_start : timestamp_t
-        * worker_task_queue : string
+        * worker_control_request_queue : string
+        * worker_task_request_queue : string
         * current_task : task_t
         * current_task_start : timestamp_t
         * current_task_status : task_status_t
@@ -26,8 +28,6 @@
         * last_task_result : task_result_t
         * last_task_begin : timestamp_t
         * last_task_end : timestamp_t
-        * statistics_task_done : int
-        * statistics_task_fail : int
         * status_update : timestamp_t
     * timestamp_t
         * string : 'yyyy-mm-dd hh-MM:ss.dddddd KST'
