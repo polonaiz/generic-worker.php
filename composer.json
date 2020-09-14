@@ -7,7 +7,7 @@
 		}
 	],
 	"require": {
-		"php": "^7.3",
+		"php": "^7.4",
 		"ext-json": "*",
 		"recoil/kernel": "^1.0",
 		"recoil/recoil": "^1.0",

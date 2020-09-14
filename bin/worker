@@ -5,7 +5,8 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 use Recoil\React\ReactKernel;
-use Executor\SimpleWorker;
+use Executor\Worker;
 
-ReactKernel::start(SimpleWorker::mainAsync());
+
+ReactKernel::start(Worker::mainAsync());
 

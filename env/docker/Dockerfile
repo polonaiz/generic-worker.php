@@ -1,4 +1,4 @@
-FROM php:7.4.7-zts
+FROM php:7.4.9-zts
 
 # change timezone from UTC to KST
 RUN apt-get update && \
