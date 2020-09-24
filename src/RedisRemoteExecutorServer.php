@@ -106,11 +106,12 @@ class RedisRemoteExecutorServer
 					case 'executeClosure':
 						//
 						$closure = $request['closure'];
-						$parameter = $request['parameter'];
+						$parameter = $request['parameter'] ?? [];
 						//
 						$return = \call_user_func_array(\unserialize($closure), $parameter);
 						//
 						yield $this->redisClient->lpush($responseQueue, \json_encode([
+							'type' => 'success',
 							'return' => $return
 						]));
 						break;

@@ -64,7 +64,7 @@ class RedisRemoteExecutorStub
 		yield $redisClient->lpush($workerStatus['workerTaskRequestQueue'], \json_encode([
 			'type' => 'executeClosure',
 			'closure' => self::serializeClosure($task->closure),
-			'parameter' => $task->param,
+			'parameter' => $task->parameter,
 			'responseQueue' => $responseQueue
 		]));
 
