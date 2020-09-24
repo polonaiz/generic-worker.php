@@ -84,13 +84,22 @@ class RedisRemoteExecutorServer
 				continue;
 			}
 
-			//
 			[$queue, $serializedRequest] = $popped;
 			$request = \json_decode($serializedRequest, true);
+			if (!isset($request['responseQueue']))
+			{
+				echo \json_encode([
+						'type' => 'invalidRequest',
+						'queue' => $queue,
+						'request' => $request
+					]) . PHP_EOL . PHP_EOL;
+				continue;
+			}
 			$responseQueue = $request['responseQueue'];
 
 			try
 			{
+
 				$requestType = $request['type'];
 				switch ($requestType)
 				{
@@ -112,11 +121,27 @@ class RedisRemoteExecutorServer
 			}
 			catch (\Throwable $t)
 			{
-				$exception = \serialize($t);
 				yield $this->redisClient->lpush($responseQueue, \json_encode([
-					'exception' => $exception
+					'type' => 'exception',
+					'catchPosition' => 'workerLoop',
+					'message' => $t->getMessage(),
+					'trace' => $this->getTraceSafe($t),
 				]));
 			}
 		}
+	}
+
+	/**
+	 * @param $t \Throwable
+	 * @return array|string
+	 */
+	public static function getTraceSafe(\Throwable $t)
+	{
+		/** @noinspection PhpUnusedLocalVariableInspection */
+		$jsonTrace = \json_encode($t->getTrace());
+		$jsonError = \json_last_error();
+		return ($jsonError === JSON_ERROR_NONE) ?
+			$t->getTrace() :
+			$t->getTraceAsString();
 	}
 }

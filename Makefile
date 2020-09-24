@@ -1,4 +1,5 @@
 RUNTIME_TAG='polonaiz/executor'
+RUNTIME_DEV_TAG='polonaiz/executor-dev'
 
 build: \
 	runtime-build \
@@ -18,7 +19,10 @@ update-code:
 runtime-build:
 	docker build \
 		--tag ${RUNTIME_TAG} \
-		./env/docker
+		./env/docker/runtime
+	docker build \
+		--tag ${RUNTIME_DEV_TAG} \
+		./env/docker/runtime-dev
 
 runtime-shell:
 	docker run --rm -it \
@@ -43,6 +47,14 @@ composer-update-in-runtime:
 composer-clean:
 	rm -rf ./vendor
 
-start:
-	./bin/worker
-	
+redis-start:
+	docker run \
+		--rm --detach --publish 6379:6379 \
+		--name redis \
+		redis
+
+worker-start-in-runtime:
+	./bin/worker --worker-id='local-single-worker'
+	docker run --rm --network 'host' \
+		-v $(shell pwd):/opt/project \
+		${RUNTIME_TAG} /opt/project/bin/worker

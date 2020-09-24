@@ -24,6 +24,12 @@ class RedisRemoteExecutorStub
 			)->createClient($this->config['redisTarget'] ??= 'localhost');
 	}
 
+	/**
+	 * @param ExecuteClosureTask $task
+	 * @param array $option
+	 * @return \Generator|mixed
+	 * @throws \Exception
+	 */
 	public function executeTaskAsync(ExecuteClosureTask $task, $option = [])
 	{
 		$redisClient = $this->config['redisClient'];
@@ -35,28 +41,38 @@ class RedisRemoteExecutorStub
 			);
 			for ($idx = 0; $idx < count($result); $idx+=2)
 			{
-				$workerStatuses[$result[$idx]] = $result[$idx+1];
+				$workerStatus = \json_decode($result[$idx+1],true);
+				if($workerStatus['workerStatusUpdateTime'] + 60 < \time())
+				{
+					// exclude not active worker
+					continue;
+				}
+				$workerStatuses[] = $workerStatus;
 			}
 		}
 
 		// choose worker
+		if(count($workerStatuses) === 0)
+		{
+			throw new \Exception("worker not available");
+		}
 		$workerStatus = $workerStatuses[0];
 
 		// push task
-		$returnQueue = \sprintf('task-%s-return', $taskId = \uniqid());
-		yield $redisClient->del($returnQueue);
-		yield $redisClient->lpush($workerTaskQueue, \json_encode([
-			'type' => 'exec_php_closure',
+		$responseQueue = \sprintf('task-%s-response', $taskId = \uniqid());
+		yield $redisClient->del($responseQueue);
+		yield $redisClient->lpush($workerStatus['workerTaskRequestQueue'], \json_encode([
+			'type' => 'executeClosure',
 			'closure' => self::serializeClosure($task->closure),
 			'parameter' => $task->param,
-			'returnQueue' => $returnQueue
+			'responseQueue' => $responseQueue
 		]));
 
 		// wait result
 		$popped = null;
 		while ($popped === null)
 		{
-			$popped = yield $redisClient->brpop($returnQueue, $timeout = 1);
+			$popped = yield $redisClient->brpop($responseQueue, $timeout = 1);
 		}
 
 		// return result
