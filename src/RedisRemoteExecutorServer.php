@@ -73,11 +73,7 @@ class RedisRemoteExecutorServer
 			$now = new \DateTime();
 			$this->status['workerStatusUpdateTime'] = $now->getTimestamp();
 			$this->status['workerStatusUpdateTimeHuman'] = $now->format('Y-m-d H:i:s.u T');
-			yield $this->redisClient->hset(
-				RedisRemoteExecutorScheme::makeWorkerStatusHashsetKey(),
-				$this->status['workerId'],
-				\json_encode($this->status)
-			);
+			yield $this->updateStatus();
 
 			if ($popped === null) // timed out
 			{
@@ -99,7 +95,6 @@ class RedisRemoteExecutorServer
 
 			try
 			{
-
 				$requestType = $request['type'];
 				switch ($requestType)
 				{
@@ -144,5 +139,14 @@ class RedisRemoteExecutorServer
 		return ($jsonError === JSON_ERROR_NONE) ?
 			$t->getTrace() :
 			$t->getTraceAsString();
+	}
+
+	private function updateStatus() : \Generator
+	{
+		yield $this->redisClient->hset(
+			RedisRemoteExecutorScheme::makeWorkerStatusHashsetKey(),
+			$this->status['workerId'],
+			\json_encode($this->status)
+		);
 	}
 }

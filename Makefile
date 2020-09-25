@@ -54,7 +54,14 @@ redis-start:
 		redis
 
 worker-start-in-runtime:
-	./bin/worker --worker-id='local-single-worker'
-	docker run --rm --network 'host' \
+	docker run --rm -d --network 'host' \
 		-v $(shell pwd):/opt/project \
-		${RUNTIME_TAG} /opt/project/bin/worker
+		--name 'worker-1' \
+		${RUNTIME_TAG} /opt/project/bin/worker --worker-id='worker-1'
+	docker run --rm -d --network 'host' \
+		-v $(shell pwd):/opt/project \
+		--name 'worker-2' \
+		${RUNTIME_TAG} /opt/project/bin/worker --worker-id='worker-2'
+
+worker-stop-in-runtime:
+	docker rm -f worker-1 worker-2
