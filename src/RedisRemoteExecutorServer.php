@@ -46,6 +46,8 @@ class RedisRemoteExecutorServer
 				'workerStatusUpdateTimeHuman' =>
 					$now->format('Y-m-d H:i:s.u T'),
 			];
+
+		echo 'executor initialized.' . PHP_EOL;
 	}
 
 	/**
@@ -54,31 +56,36 @@ class RedisRemoteExecutorServer
 	 */
 	public function runAsync()
 	{
-		yield Recoil::all([
-			$this->loopHandleRequestAsync(),
-		]);
-	}
+		$this->status['state'] = 'running';
+		yield $this->updateStatus();
 
+		//
+		yield $this->loopHandleRequestAsync();
+	}
 	private function loopHandleRequestAsync()
 	{
 		while (true)
 		{
+			if ($this->status['state'] === 'stopping')
+			{
+				$this->status['state'] = 'stopped';
+				echo 'exit loop' . PHP_EOL;
+				return;
+			}
+
 			//
 			$popped = yield $this->redisClient->brPop(
 				$this->status['workerControlRequestQueue'],
 				$this->status['workerTaskRequestQueue'],
-				$maxWaitSec = 1
+				$maxWaitSec = 5
 			);
-
-			$now = new \DateTime();
-			$this->status['workerStatusUpdateTime'] = $now->getTimestamp();
-			$this->status['workerStatusUpdateTimeHuman'] = $now->format('Y-m-d H:i:s.u T');
-			yield $this->updateStatus();
-
 			if ($popped === null) // timed out
 			{
+				echo 'waiting request' . PHP_EOL;
 				continue;
 			}
+
+			yield $this->updateStatus();
 
 			[$queue, $serializedRequest] = $popped;
 			$request = \json_decode($serializedRequest, true);
@@ -114,8 +121,7 @@ class RedisRemoteExecutorServer
 					default:
 						throw new \Exception("unsupported request type");
 				}
-			}
-			catch (\Throwable $t)
+			} catch (\Throwable $t)
 			{
 				yield $this->redisClient->lpush($responseQueue, \json_encode([
 					'type' => 'exception',
@@ -141,12 +147,21 @@ class RedisRemoteExecutorServer
 			$t->getTraceAsString();
 	}
 
-	private function updateStatus() : \Generator
+	private function updateStatus(): \Generator
 	{
+		$now = new \DateTime();
+		$this->status['workerStatusUpdateTime'] = $now->getTimestamp();
+		$this->status['workerStatusUpdateTimeHuman'] = $now->format('Y-m-d H:i:s.u T');
+
 		yield $this->redisClient->hset(
 			RedisRemoteExecutorScheme::makeWorkerStatusHashsetKey(),
 			$this->status['workerId'],
 			\json_encode($this->status)
 		);
+	}
+
+	public function stop()
+	{
+		$this->status['state'] = 'stopping';
 	}
 }

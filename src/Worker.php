@@ -26,8 +26,12 @@ class Worker
 		$cliParser = new Parser();
 		$cliParams = $cliParser->parse($argv);
 		$workerId = $cliParams['worker-id'];
+		$redisTarget = $cliParams['redis'];
 
-		$server = new RedisRemoteExecutorServer(['workerId' => $workerId]);
+		$server = new RedisRemoteExecutorServer([
+		    'workerId' => $workerId,
+            'redisTarget' => $redisTarget
+        ]);
 		yield $server->initializeAsync();
 		yield $server->runAsync();
 	}

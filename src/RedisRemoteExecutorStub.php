@@ -35,6 +35,8 @@ class RedisRemoteExecutorStub
 		$redisClient = $this->config['redisClient'];
 
 		$workerStatuses = [];
+		$remainTry = 10;
+		while(--$remainTry > 0)
 		{
 			$result = yield $redisClient->hgetall(
 				RedisRemoteExecutorScheme::makeWorkerStatusHashsetKey()
@@ -49,9 +51,12 @@ class RedisRemoteExecutorStub
 				}
 				$workerStatuses[] = $workerStatus;
 			}
+			if(count($workerStatuses) > 0)
+            {
+                break;
+            }
+            yield 1;
 		}
-
-		// choose worker
 		if(count($workerStatuses) === 0)
 		{
 			throw new \Exception("worker not available");
@@ -76,7 +81,7 @@ class RedisRemoteExecutorStub
 		}
 
 		// return result
-		return \json_decode($popped[1]);
+		return \json_decode($popped[1], true);
 	}
 
 	private static function serializeClosure($closure)

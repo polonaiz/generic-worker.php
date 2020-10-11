@@ -1,5 +1,6 @@
 RUNTIME_TAG='polonaiz/executor'
 RUNTIME_DEV_TAG='polonaiz/executor-dev'
+REDIS_AUTH_PASS='LOCAL_REDIS_PASS'
 
 build: \
 	runtime-build \
@@ -47,21 +48,36 @@ composer-update-in-runtime:
 composer-clean:
 	rm -rf ./vendor
 
+redis-restart: \
+	redis-stop \
+	redis-start
+
 redis-start:
 	docker run \
 		--rm --detach --publish 6379:6379 \
 		--name redis \
-		redis
+		redis \
+		redis-server --requirepass ${REDIS_AUTH_PASS}
+	docker ps -f name=redis
+
+redis-stop:
+	-docker rm -f redis
 
 worker-start-in-runtime:
-	docker run --rm -d --network 'host' \
+	docker run --rm -d --tty --network 'host' \
 		-v $(shell pwd):/opt/project \
-		--name 'worker-1' \
-		${RUNTIME_TAG} /opt/project/bin/worker --worker-id='worker-1'
-	docker run --rm -d --network 'host' \
-		-v $(shell pwd):/opt/project \
-		--name 'worker-2' \
-		${RUNTIME_TAG} /opt/project/bin/worker --worker-id='worker-2'
+		--name 'executor-1' \
+		${RUNTIME_TAG} /opt/project/bin/worker --worker-id='worker-1' --redis='redis://:${REDIS_AUTH_PASS}:localhost:6379'
+#	docker run --rm -d --network 'host' \
+#		-v $(shell pwd):/opt/project \
+#		--name 'executor-2' \
+#		${RUNTIME_TAG} /opt/project/bin/worker --worker-id='worker-2' --redis='redis://:${REDIS_AUTH_PASS}:localhost:6379'
 
 worker-stop-in-runtime:
 	docker rm -f worker-1 worker-2
+
+worker-start:
+	./bin/worker --worker-id='worker-1' --redis='redis://:${REDIS_AUTH_PASS}@localhost:6379'
+
+stub-start:
+	./bin/worker --worker-id='worker-1' --redis='redis://:${REDIS_AUTH_PASS}@localhost:6379'
